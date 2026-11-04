@@ -4,6 +4,38 @@ import CityEngine
 import LifeCore
 import SwiftUI
 
+/// Frame cadence from RealityKit's per-frame scene update, plus click latency. Perf numbers only, never shipped.
+@MainActor enum FrameLog {
+    static var dts: [Double] = []
+    static var first: ContinuousClock.Instant?
+    static var lastFrame: ContinuousClock.Instant = .now
+    static var recording = false
+
+    static func tick(_ dt: TimeInterval) {
+        lastFrame = .now
+        if first == nil { first = .now; print("first frame at \(Date().timeIntervalSince(processStart)) s after process start (SceneEvents.Update)") }
+        if recording { dts.append(dt) }
+    }
+
+    static var processStart: Date {
+        var info = kinfo_proc(), size = MemoryLayout<kinfo_proc>.stride, mib = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        sysctl(&mib, 4, &info, &size, nil, 0)
+        let t = info.kp_proc.p_starttime
+        return Date(timeIntervalSince1970: Double(t.tv_sec) + Double(t.tv_usec) / 1e6)
+    }
+
+    static func summary(_ name: String) {
+        recording = false
+        let d = dts.sorted(); defer { dts = [] }
+        guard d.count > 1 else { return print("perf \(name): \(d.count) frames") }
+        let total = d.reduce(0, +)
+        func p(_ q: Double) -> Double { d[min(d.count - 1, Int(q * Double(d.count)))] * 1000 }
+        print(String(format: "perf %@: %d frames in %.2f s = %.1f fps; frame ms p50 %.1f p95 %.1f p99 %.1f max %.1f; >20ms frames %d",
+                     name, d.count, total, Double(d.count) / total, p(0.5), p(0.95), p(0.99), d.last! * 1000, d.filter { $0 > 0.020 }.count))
+        fflush(stdout)
+    }
+}
+
 /// Verification harness for machines where the shell has no screen recording or input-posting
 /// permission. Set LIFEOS_DRIVE to `;`-separated steps and it posts real NSEvents to the
 /// app's event queue, so they travel the normal AppKit and SwiftUI event path. Inert without the variable.
@@ -62,6 +94,9 @@ import SwiftUI
         case "scroll":  // scroll <lines> <times> [p <x> <y>]; the view center without a point
             await scroll(lines: Int32(f[0]), times: Int(f[1]),
                          at: f.count >= 4 ? CGPoint(x: f[2], y: f[3]) : CGPoint(x: size.width / 2, y: size.height / 2))
+        case "perfstart": FrameLog.dts = []; FrameLog.recording = true
+        case "perfend": FrameLog.summary(a.first ?? "")
+        case "latency": await latency(point(a, s), s)
         case "key": key(a[0], command: true)  // key <char>: ⌘ + char
         case "esc": key("\u{1b}", command: false, code: 53)
         default: print("unknown step \(cmd)")
@@ -106,6 +141,24 @@ import SwiftUI
             mouse(.leftMouseUp, p, clicks: n)
             try? await Task.sleep(for: .milliseconds(60))
         }
+    }
+
+    /// Click at p, then time until the selection changes and until the next rendered frame after that.
+    private static func latency(_ p: CGPoint, _ s: State) async {
+        let before = s.selected.wrappedValue
+        mouse(.leftMouseDown, p)
+        try? await Task.sleep(for: .milliseconds(30))  // a tap needs a real press; timing starts at release
+        let t0 = ContinuousClock.now
+        mouse(.leftMouseUp, p)
+        var tSel: ContinuousClock.Instant?
+        while ContinuousClock.now - t0 < .seconds(1) {
+            if tSel == nil, s.selected.wrappedValue != before { tSel = .now }
+            if let tSel, FrameLog.lastFrame > tSel { break }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        func ms(_ d: Duration) -> Double { Double(d.components.attoseconds) / 1e15 + Double(d.components.seconds) * 1000 }
+        print(String(format: "latency: click -> selection %.1f ms, click -> next frame after selection %.1f ms",
+                     tSel.map { ms($0 - t0) } ?? -1, ms(FrameLog.lastFrame - t0)))
     }
 
     private static func drag(from p: CGPoint, by d: CGSize) async {

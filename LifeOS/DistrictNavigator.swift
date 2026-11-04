@@ -54,6 +54,12 @@ struct DistrictNavigator: View {
         }
     }
 
+    /// District rows announce whether their buildings are listed; other rows have no expanded state.
+    private func expansion(_ r: NavigatorRows.Row) -> String {
+        guard case .focus(let d) = r.action else { return "" }
+        return store.focusedDistrict == d ? "expanded" : "collapsed"
+    }
+
     private func perform(_ r: NavigatorRows.Row) {
         switch r.action {
         case .focus(let d): store.focus(d)
@@ -74,5 +80,7 @@ struct DistrictNavigator: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(r.label)
+        .accessibilityAddTraits(selected(r) ? .isSelected : [])
+        .accessibilityValue(expansion(r))
     }
 }

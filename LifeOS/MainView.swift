@@ -8,12 +8,21 @@ struct MainView: View {
     @State private var panels: [CGRect] = []
     @State private var opened: String?
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var frameProbe: ((TimeInterval) -> Void)? {
+        #if DEBUG
+        FrameLog.tick
+        #else
+        nil
+        #endif
+    }
 
     var body: some View {
         ZStack {
             CityViewport(camera: $store.camera, hoveredBuildingID: $store.hoveredBuildingID,
                          selectedBuildingID: Binding(get: { store.selectedBuildingID }, set: { store.select($0) }),
-                         obstructions: panels, onOpenBuilding: { opened = $0 })
+                         obstructions: panels, onFrame: frameProbe, onOpenBuilding: { opened = $0 })
                 .ignoresSafeArea()
             VStack(spacing: 12) {
                 TopBar().panel()
@@ -37,9 +46,11 @@ struct MainView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focused)
+        .accessibilityElement(children: .contain)  // the focus target is a container, not an unlabeled group
+        .accessibilityLabel("Life OS")
         .onAppear { focused = true }
         .onExitCommand { store.escape() }
-        .animation(.smooth(duration: 0.2), value: store.selectedBuildingID)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.2), value: store.selectedBuildingID)
         #if DEBUG
         .task {
             await DebugDriver.runIfRequested(.init(

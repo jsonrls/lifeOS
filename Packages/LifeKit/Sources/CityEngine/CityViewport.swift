@@ -10,6 +10,7 @@ public struct CityViewport: View {
     @Binding private var selectedBuildingID: String?
     private let onOpenBuilding: (String) -> Void
     private let obstructions: [CGRect]
+    private let onFrame: ((TimeInterval) -> Void)?
 
     @State private var cameraEntity = Entity()
     // GestureState, not State: a cancelled gesture never calls onEnded, and a stale baseline would jump the next one.
@@ -17,16 +18,18 @@ public struct CityViewport: View {
     @GestureState private var lastMagnification: CGFloat = 1
     @GestureState private var lastRotation: Angle = .zero
     @State private var scrollSave: Task<Void, Never>?
+    @State private var frameSub: EventSubscription?
 
     private let store = CameraStore(defaults: .standard)
 
     public init(camera: Binding<CameraState>, hoveredBuildingID: Binding<String?>,
-                selectedBuildingID: Binding<String?>, obstructions: [CGRect] = [],
+                selectedBuildingID: Binding<String?>, obstructions: [CGRect] = [], onFrame: ((TimeInterval) -> Void)? = nil,
                 onOpenBuilding: @escaping (String) -> Void) {
         _camera = camera
         _hoveredBuildingID = hoveredBuildingID
         _selectedBuildingID = selectedBuildingID
         self.obstructions = obstructions
+        self.onFrame = onFrame
         self.onOpenBuilding = onOpenBuilding
     }
 
@@ -35,10 +38,13 @@ public struct CityViewport: View {
             RealityView { content in
                 content.add(CitySceneBuilder.makeScene())
                 content.add(cameraEntity)
+                if let onFrame { frameSub = content.subscribe(to: SceneEvents.Update.self) { onFrame($0.deltaTime) } }  // perf probe, off unless given
             } update: { _ in
                 Self.apply(camera, to: cameraEntity)
             }
             .realityViewCameraControls(.none)  // our gestures drive the camera, not RealityKit's orbit
+            .accessibilityLabel("Isometric city map")
+            .accessibilityHint("The city is also navigable through the district list.")
             .gesture(pan(viewHeight: Float(geo.size.height)))
             .simultaneousGesture(pinch)
             .simultaneousGesture(twist)
