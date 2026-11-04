@@ -1,0 +1,14 @@
+name: CI
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path Packages/LifeKit
+      - run: brew install xcodegen
+      - run: xcodegen && xcodebuild -scheme LifeOS -destination 'platform=macOS' build
