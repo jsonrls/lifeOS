@@ -12,6 +12,6 @@ let package = Package(
         .target(name: "LifeCore"),
         .target(name: "CityEngine", dependencies: ["LifeCore"]),
         .testTarget(name: "LifeCoreTests", dependencies: ["LifeCore"]),
-        .testTarget(name: "CityEngineTests", dependencies: ["CityEngine"]),
+        .testTarget(name: "CityEngineTests", dependencies: ["CityEngine", "LifeCore"]),
     ]
 )
