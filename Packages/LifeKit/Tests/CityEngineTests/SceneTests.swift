@@ -52,4 +52,24 @@ struct SceneTests {
             #expect(b.min.y >= -0.01 && b.max.y <= 30, "\(e.name)")
         }
     }
+
+    @Test func collisionBoxWrapsVisibleBounds() throws {
+        let scene = CitySceneBuilder.makeScene()
+        for e in buildingEntities(scene) {
+            let vis = e.visualBounds(relativeTo: e)
+            let shape = try #require(e.components[CollisionComponent.self]?.shapes.first)
+            let box = shape.bounds
+            #expect(box.min.x <= vis.min.x + 0.01 && box.max.x >= vis.max.x - 0.01, "\(e.name) x")
+            #expect(box.min.y <= vis.min.y + 0.01 && box.max.y >= vis.max.y - 0.01, "\(e.name) y")
+            #expect(box.min.z <= vis.min.z + 0.01 && box.max.z >= vis.max.z - 0.01, "\(e.name) z")
+            // Tight: no more than 0.05 of empty space per axis.
+            #expect(box.extents.x <= vis.extents.x + 0.05 && box.extents.y <= vis.extents.y + 0.05
+                    && box.extents.z <= vis.extents.z + 0.05, "\(e.name) loose")
+        }
+        // campus tops out at h + 0.2; slab depth is 0.6 of the inset footprint
+        let campus = try #require(buildingEntities(scene).first { $0.name == Picking.entityName(for: "productivity.coworking-hub") })
+        #expect(try #require(campus.components[CollisionComponent.self]?.shapes.first).bounds.max.y >= 5.2)
+        let slab = try #require(buildingEntities(scene).first { $0.name == Picking.entityName(for: "productivity.planning-center") })
+        #expect(try #require(slab.components[CollisionComponent.self]?.shapes.first).bounds.extents.z < 4)
+    }
 }

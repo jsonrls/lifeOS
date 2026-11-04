@@ -62,7 +62,7 @@ import RealityKit
     private static func roads() -> Entity {
         let r = Entity()
         r.name = "roads"
-        let asphalt = Mat.matte([0.34, 0.35, 0.38]), len = extent * 2, w: Float = 4
+        let asphalt = Mat.matte([0.34, 0.35, 0.38]), len = extent * 2, w: Float = 6  // fills the 6-tile gaps (7..13)
         for p: Float in [-10, 10] {
             r.addChild(slab(len, 0.06, w, x: 0, z: p, top: 0.04, asphalt))
             r.addChild(slab(w, 0.06, len, x: p, z: 0, top: 0.04, asphalt))

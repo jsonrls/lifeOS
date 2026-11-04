@@ -64,12 +64,18 @@ public extension DistrictType {
         case .hall: hall(root, ctx)
         case .garden: garden(root, ctx)
         }
-        let size: SIMD3<Float> = [ctx.w, ctx.h, ctx.d]
-        var collision = CollisionComponent(shapes: [.generateBox(size: size).offsetBy(translation: [0, ctx.h / 2, 0])])
+        let (size, center) = collisionBox(of: root)
+        var collision = CollisionComponent(shapes: [.generateBox(size: size).offsetBy(translation: center)])
         collision.filter = CollisionFilter(group: [], mask: [])  // pick-only, no physics
         root.components.set(collision)
         root.components.set(InputTargetComponent())
         return root
+    }
+
+    /// Box wrapping the built geometry, in the root's local space.
+    static func collisionBox(of root: Entity) -> (size: SIMD3<Float>, center: SIMD3<Float>) {
+        let b = root.visualBounds(relativeTo: root)
+        return (b.extents, b.center)
     }
 
     // MARK: primitives
