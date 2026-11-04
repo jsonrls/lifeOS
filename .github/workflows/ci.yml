@@ -1,0 +1,15 @@
+name: CI
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+jobs:
+  build:
+    # shortcut: preview image because macos-26 jobs never got a runner and SceneTests crash on macos-26-intel; move to a GA arm64 label when it has capacity
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path Packages/LifeKit
+      - run: brew install xcodegen
+      - run: xcodegen && xcodebuild -scheme LifeOS -destination 'platform=macOS' test
