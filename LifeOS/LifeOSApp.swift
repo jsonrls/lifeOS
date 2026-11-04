@@ -1,37 +1,38 @@
 import CityEngine
+import LifeCore
 import SwiftUI
 
 @main
 struct LifeOSApp: App {
+    @State private var store: CityStore
+
+    init() {
+        let cameras = CameraStore(defaults: .standard)
+        _store = State(initialValue: CityStore(camera: cameras.load(), persist: cameras.save))
+    }
+
     var body: some Scene {
-        WindowGroup { CityScreen() }
+        WindowGroup { MainView(store: store) }
             .defaultSize(width: 1280, height: 800)
+            .windowResizability(.contentMinSize)
+            .commands { CityCommands(store: store) }
+        Settings { Text("Settings").padding(40).frame(minWidth: 320) }
     }
 }
 
-/// Temporary host for the viewport. The app shell task replaces it.
-private struct CityScreen: View {
-    @State private var camera = CameraStore(defaults: .standard).load()
-    @State private var hovered: String?
-    @State private var selected: String?
-    @State private var opened: String?
+/// ⌘1 City View, ⌘2...⌘6 districts in navigator order, Esc deselects.
+private struct CityCommands: Commands {
+    let store: CityStore
 
-    var body: some View {
-        CityViewport(camera: $camera, hoveredBuildingID: $hovered, selectedBuildingID: $selected,
-                     onOpenBuilding: { opened = $0 })
-            .ignoresSafeArea()
-            .overlay(alignment: .bottomLeading) {
-                Text(selected ?? "nothing selected")
-                    .font(.callout.monospaced())
-                    .padding(8)
-                    .background(.regularMaterial, in: .rect(cornerRadius: 8))
-                    .padding()
+    var body: some Commands {
+        CommandMenu("City") {
+            Button("City View") { store.showCity() }.keyboardShortcut("1")
+            ForEach(Array(DistrictType.navigatorOrder.enumerated()), id: \.element) { i, d in
+                Button(d.displayName) { store.focus(d) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(i + 2)")))
             }
-            #if DEBUG
-            .task {
-                await DebugDriver.runIfRequested(.init(camera: $camera, hovered: $hovered, selected: $selected,
-                                                       opened: { opened }))
-            }
-            #endif
+            Divider()
+            Button("Deselect") { store.escape() }.keyboardShortcut(.escape, modifiers: [])
+        }
     }
 }

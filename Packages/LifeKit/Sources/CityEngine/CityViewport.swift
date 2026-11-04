@@ -3,11 +3,13 @@ import RealityKit
 import SwiftUI
 
 /// The interactive 3D city: orthographic camera, pan/zoom/rotate gestures, hover and tap picking.
+/// `obstructions` are floating panels over the city, in the view's top-left point space: scrolling over them does not zoom.
 public struct CityViewport: View {
     @Binding private var camera: CameraState
     @Binding private var hoveredBuildingID: String?
     @Binding private var selectedBuildingID: String?
     private let onOpenBuilding: (String) -> Void
+    private let obstructions: [CGRect]
 
     @State private var cameraEntity = Entity()
     // GestureState, not State: a cancelled gesture never calls onEnded, and a stale baseline would jump the next one.
@@ -19,10 +21,12 @@ public struct CityViewport: View {
     private let store = CameraStore(defaults: .standard)
 
     public init(camera: Binding<CameraState>, hoveredBuildingID: Binding<String?>,
-                selectedBuildingID: Binding<String?>, onOpenBuilding: @escaping (String) -> Void) {
+                selectedBuildingID: Binding<String?>, obstructions: [CGRect] = [],
+                onOpenBuilding: @escaping (String) -> Void) {
         _camera = camera
         _hoveredBuildingID = hoveredBuildingID
         _selectedBuildingID = selectedBuildingID
+        self.obstructions = obstructions
         self.onOpenBuilding = onOpenBuilding
     }
 
@@ -46,7 +50,7 @@ public struct CityViewport: View {
                 case .ended: setHovered(nil)
                 }
             }
-            .background(ScrollWheelMonitor(onScroll: scroll))
+            .background(ScrollWheelMonitor(obstructions: obstructions, onScroll: scroll))
             .background(Color(red: 0.80, green: 0.85, blue: 0.87))  // pale haze, same in light and dark mode
         }
     }
@@ -132,15 +136,16 @@ public struct CityViewport: View {
 
 /// SwiftUI has no scroll wheel gesture on macOS. A local monitor sees wheel events without taking
 /// mouse clicks away from the RealityView, and it lives only while this view is in a window.
-/// shortcut: bounds check only, so floating panels over the city would zoom it too; add a hit test with the panels.
 private struct ScrollWheelMonitor: NSViewRepresentable {
+    let obstructions: [CGRect]
     let onScroll: @MainActor (Float, Bool) -> Void
 
     func makeNSView(context: Context) -> MonitorView { MonitorView() }
-    func updateNSView(_ view: MonitorView, context: Context) { view.onScroll = onScroll }
+    func updateNSView(_ view: MonitorView, context: Context) { view.onScroll = onScroll; view.obstructions = obstructions }
 
     final class MonitorView: NSView {
         var onScroll: (@MainActor (Float, Bool) -> Void)?
+        var obstructions: [CGRect] = []
         private var monitor: Any?
 
         override func viewDidMoveToWindow() {
@@ -149,8 +154,10 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
             monitor = nil
             guard window != nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] e in
-                guard let self, e.window === self.window,
-                      self.bounds.contains(self.convert(e.locationInWindow, from: nil)) else { return e }
+                guard let self, e.window === self.window else { return e }
+                let p = self.convert(e.locationInWindow, from: nil)
+                let top = CGPoint(x: p.x, y: self.isFlipped ? p.y : self.bounds.height - p.y)
+                guard self.bounds.contains(p), !self.obstructions.contains(where: { $0.contains(top) }) else { return e }
                 self.onScroll?(Float(e.scrollingDeltaY), e.hasPreciseScrollingDeltas)
                 return nil
             }

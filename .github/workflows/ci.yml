@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: swift test --package-path Packages/LifeKit
       - run: brew install xcodegen
-      - run: xcodegen && xcodebuild -scheme LifeOS -destination 'platform=macOS' build
+      - run: xcodegen && xcodebuild -scheme LifeOS -destination 'platform=macOS' test

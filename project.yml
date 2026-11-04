@@ -24,8 +24,27 @@ targets:
         SWIFT_VERSION: "6.0"
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic
+  LifeOSTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [LifeOSTests]
+    dependencies:
+      - target: LifeOS
+      - package: LifeKit
+        product: LifeCore
+      - package: LifeKit
+        product: CityEngine
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Automatic
 schemes:
   LifeOS:
     build:
       targets:
         LifeOS: all
+        LifeOSTests: [test]
+    test:
+      targets: [LifeOSTests]

@@ -13,6 +13,7 @@ import SwiftUI
         let hovered: Binding<String?>
         let selected: Binding<String?>
         let opened: () -> String?
+        let store: CityStore
     }
 
     static func runIfRequested(_ s: State) async {
@@ -38,7 +39,7 @@ import SwiftUI
     private static func report(_ step: String, _ s: State) {
         let c = s.camera.wrappedValue
         print("[\(step)] focus=(\(c.focusX), \(c.focusZ)) zoom=\(c.zoom) yaw=\(c.yawOffset)"
-              + " selected=\(s.selected.wrappedValue ?? "nil") hovered=\(s.hovered.wrappedValue ?? "nil")"
+              + " district=\(s.store.focusedDistrict?.rawValue ?? "nil") selected=\(s.selected.wrappedValue ?? "nil") hovered=\(s.hovered.wrappedValue ?? "nil")"
               + " opened=\(s.opened() ?? "nil") view=\(size)")
         fflush(stdout)
     }
@@ -58,7 +59,11 @@ import SwiftUI
         case "drag": await drag(from: point(a, s), by: CGSize(width: f[f.count - 2], height: f[f.count - 1]))
         case "pinch": await trackpad(hidType: 8, valueField: 113, value: f[0], times: Int(f[1]))
         case "twist": await trackpad(hidType: 5, valueField: 114, value: f[0], times: Int(f[1]))
-        case "scroll": await scroll(lines: Int32(f[0]), times: Int(f[1]))
+        case "scroll":  // scroll <lines> <times> [p <x> <y>]; the view center without a point
+            await scroll(lines: Int32(f[0]), times: Int(f[1]),
+                         at: f.count >= 4 ? CGPoint(x: f[2], y: f[3]) : CGPoint(x: size.width / 2, y: size.height / 2))
+        case "key": key(a[0], command: true)  // key <char>: ⌘ + char
+        case "esc": key("\u{1b}", command: false, code: 53)
         default: print("unknown step \(cmd)")
         }
     }
@@ -113,10 +118,19 @@ import SwiftUI
         mouse(.leftMouseUp, CGPoint(x: p.x + d.width, y: p.y + d.height))
     }
 
-    private static func scroll(lines: Int32, times: Int) async {
+    private static func key(_ chars: String, command: Bool, code: UInt16 = 0) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            NSApp.postEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: command ? .command : [],
+                                             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                             context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                             isARepeat: false, keyCode: code)!, atStart: false)
+        }
+    }
+
+    private static func scroll(lines: Int32, times: Int, at p: CGPoint) async {
         for _ in 0..<times {
             let e = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0)!
-            windowLocation(e, CGPoint(x: size.width / 2, y: size.height / 2))
+            windowLocation(e, p)  // this private setter takes top-left points and flips them itself
             e.setIntegerValueField(CGEventField(rawValue: 51)!, value: Int64(window.windowNumber))  // the event's window
             NSApp.postEvent(NSEvent(cgEvent: e)!, atStart: false)
             try? await Task.sleep(for: .milliseconds(10))
