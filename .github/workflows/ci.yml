@@ -6,7 +6,8 @@ on:
     branches: [staging, main]
 jobs:
   build:
-    runs-on: macos-26
+    # shortcut: Intel pool because macos-26 (arm64) jobs never got a runner, return to macos-26 when capacity recovers
+    runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v4
       - run: swift test --package-path Packages/LifeKit
