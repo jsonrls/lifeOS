@@ -26,6 +26,8 @@ import Observation
 
     func focus(_ d: DistrictType) {
         guard let bounds = CityCatalog.districts.first(where: { $0.id == d })?.bounds else { return }
+        // A selection in another district would leave the inspector showing a building the camera left.
+        if let id = selectedBuildingID, CityCatalog.building(id: id)?.district != d { selectedBuildingID = nil }
         focusedDistrict = d
         move(to: .districtView(bounds))
     }

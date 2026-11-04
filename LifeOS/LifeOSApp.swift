@@ -20,7 +20,7 @@ struct LifeOSApp: App {
     }
 }
 
-/// ⌘1 City View, ⌘2...⌘6 districts in navigator order, Esc deselects.
+/// ⌘1 City View, ⌘2...⌘6 districts in navigator order. Esc lives on MainView (`onExitCommand`), so Settings keeps its own.
 private struct CityCommands: Commands {
     let store: CityStore
 
@@ -31,8 +31,6 @@ private struct CityCommands: Commands {
                 Button(d.displayName) { store.focus(d) }
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 2)")))
             }
-            Divider()
-            Button("Deselect") { store.escape() }.keyboardShortcut(.escape, modifiers: [])
         }
     }
 }

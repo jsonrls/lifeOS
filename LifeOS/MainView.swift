@@ -7,6 +7,7 @@ struct MainView: View {
     @Bindable var store: CityStore
     @State private var panels: [CGRect] = []
     @State private var opened: String?
+    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
@@ -33,6 +34,10 @@ struct MainView: View {
         }
         .frame(minWidth: 900, minHeight: 600)
         .onPreferenceChange(PanelFrames.self) { panels = $0 }
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onAppear { focused = true }
         .onExitCommand { store.escape() }
         .animation(.smooth(duration: 0.2), value: store.selectedBuildingID)
         #if DEBUG
