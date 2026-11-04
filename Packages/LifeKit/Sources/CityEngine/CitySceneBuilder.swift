@@ -106,11 +106,13 @@ import RealityKit
 
     private static func lights() -> [Entity] {
         let sun = DirectionalLight()
-        sun.light.intensity = 2800
-        sun.shadow = DirectionalLightComponent.Shadow()
-        sun.look(at: .zero, from: [-30, 45, -25], relativeTo: nil)
+        sun.light.intensity = 1900
+        // Fixed projection covers the whole city; the automatic one follows the camera, 200 units away.
+        sun.shadow = DirectionalLightComponent.Shadow(
+            shadowProjection: .fixed(zNear: 1, zFar: 160, orthographicScale: 45), depthBias: 1)
+        sun.look(at: .zero, from: [-25, 60, 45], relativeTo: nil)  // from the viewer's left, so shadows fall away
         let fill = DirectionalLight()  // weak, shadowless ambient fill from the opposite side
-        fill.light.intensity = 700
+        fill.light.intensity = 450
         fill.look(at: .zero, from: [30, 25, 30], relativeTo: nil)
         return [sun, fill]
     }

@@ -1,5 +1,6 @@
 import Testing
 import RealityKit
+import simd
 import LifeCore
 @testable import CityEngine
 
@@ -28,6 +29,36 @@ struct SceneTests {
             #expect(e.components[CollisionComponent.self] != nil, "\(e.name)")
             #expect(e.components[InputTargetComponent.self] != nil, "\(e.name)")
         }
+    }
+
+    // The picking raycast only sees shapes whose filter matches both ways; [] groups or masks are invisible to it.
+    @Test func buildingsUseTheDefaultCollisionFilter() {
+        for e in buildingEntities(CitySceneBuilder.makeScene()) {
+            #expect(e.components[CollisionComponent.self]?.filter == .default, "\(e.name)")
+        }
+    }
+
+    // The renderer looks down the entity's -Z, so the transform must agree with the pure pose.
+    @Test func cameraEntityLooksAtTheFocusWithScreenRightAlongPanAxis() {
+        let s = CameraState(focusX: 5, focusZ: -3, zoom: 20, yawOffset: 0.2)
+        let e = Entity()
+        CityViewport.apply(s, to: e)
+        let pose = s.cameraPose
+        let m = e.transformMatrix(relativeTo: nil)
+        let right = SIMD3(m.columns.0.x, m.columns.0.y, m.columns.0.z)
+        let back = SIMD3(m.columns.2.x, m.columns.2.y, m.columns.2.z)
+        let t = Float.pi / 4 + 0.2
+        #expect(simd_length(e.position(relativeTo: nil) - pose.position) < 1e-3)
+        #expect(simd_length(back - simd_normalize(pose.position - pose.target)) < 1e-4)
+        #expect(simd_length(right - SIMD3(cos(t), 0, -sin(t))) < 1e-4)
+    }
+
+    @Test func cameraComponentMapsZoomToVerticalScaleAndContainsTheCity() throws {
+        let e = Entity()
+        CityViewport.apply(CameraState(focusX: 0, focusZ: 0, zoom: 20, yawOffset: 0), to: e)
+        let c = try #require(e.components[OrthographicCameraComponent.self])
+        #expect(c.scale == 20 && c.scaleDirection == .vertical)
+        #expect(c.near < CameraState.cameraDistance - 120 && c.far > CameraState.cameraDistance + 120)
     }
 
     @Test func pickingNameRoundTrips() {

@@ -1,5 +1,7 @@
+import CoreGraphics
 import Foundation
 import LifeCore
+import simd
 
 public struct CameraState: Codable, Equatable, Sendable {
     public var focusX: Float
@@ -63,6 +65,11 @@ public struct CameraState: Codable, Equatable, Sendable {
         return s.clamped()
     }
 
+    /// Line-based wheels report whole notches, trackpads report points.
+    public func scrolled(deltaY: Float, precise: Bool) -> CameraState {
+        zoomed(byFactor: exp(min(max(-deltaY * (precise ? 0.01 : 0.1), -10), 10)))
+    }
+
     private static func clampD(_ v: Double, _ bound: Double) -> Float {
         Float(min(max(v, -bound), bound))
     }
@@ -76,5 +83,46 @@ public struct CameraState: Codable, Equatable, Sendable {
         return CameraState(focusX: ok(focusX, d.focusX, -m...m), focusZ: ok(focusZ, d.focusZ, -m...m),
                            zoom: ok(zoom, d.zoom, Self.zoomRange),
                            yawOffset: ok(yawOffset, d.yawOffset, -Self.maxYaw...Self.maxYaw))
+    }
+}
+
+// MARK: camera placement
+
+public extension CameraState {
+    /// Far enough that the whole city stays in front of the near plane at any clamped focus.
+    static let cameraDistance: Float = 200
+
+    /// Eye sits at focus + (sin t, cos t) on (x, z), t = 45 deg + yaw, raised to the pitch.
+    /// This is the placement `panned` assumes, so the axes there and here must stay in step.
+    var cameraPose: (position: SIMD3<Float>, target: SIMD3<Float>) {
+        let t = Self.baseYaw + yawOffset
+        let target = SIMD3<Float>(focusX, 0, focusZ)
+        let flat = Self.cameraDistance * cos(Self.pitch)
+        return (target + [flat * sin(t), Self.cameraDistance * sin(Self.pitch), flat * cos(t)], target)
+    }
+
+    private var cameraAxes: (right: SIMD3<Float>, up: SIMD3<Float>, forward: SIMD3<Float>) {
+        let pose = cameraPose
+        let forward = simd_normalize(pose.target - pose.position)
+        let right = simd_normalize(simd_cross(forward, [0, 1, 0]))
+        return (right, simd_cross(right, forward), forward)
+    }
+
+    /// Orthographic projection to view points, origin top-left. The focus lands at the view center.
+    func screenPoint(of p: SIMD3<Float>, viewSize: CGSize) -> CGPoint {
+        let axes = cameraAxes
+        let d = p - cameraPose.target
+        let pointsPerUnit = Float(viewSize.height) / (2 * zoom)
+        return CGPoint(x: viewSize.width / 2 + CGFloat(simd_dot(d, axes.right) * pointsPerUnit),
+                       y: viewSize.height / 2 - CGFloat(simd_dot(d, axes.up) * pointsPerUnit))
+    }
+
+    /// Inverse of `screenPoint`: orthographic rays are parallel, so only the origin moves with the point.
+    func pickRay(at p: CGPoint, viewSize: CGSize) -> (origin: SIMD3<Float>, direction: SIMD3<Float>) {
+        let axes = cameraAxes
+        let unitsPerPoint = 2 * zoom / Float(viewSize.height)
+        let dx = Float(p.x - viewSize.width / 2) * unitsPerPoint
+        let dy = Float(viewSize.height / 2 - p.y) * unitsPerPoint
+        return (cameraPose.position + axes.right * dx + axes.up * dy, axes.forward)
     }
 }

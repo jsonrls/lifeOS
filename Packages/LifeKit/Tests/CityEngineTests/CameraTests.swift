@@ -1,5 +1,7 @@
+import CoreGraphics
 import Foundation
 import Testing
+import simd
 import LifeCore
 @testable import CityEngine
 
@@ -107,6 +109,77 @@ private let deg20 = Float(20) * .pi / 180
         #expect(v.focusX == b.footprint.center.x && v.focusZ == b.footprint.center.z)
         #expect(v == v.clamped())
     }
+}
+
+// MARK: camera placement
+
+@Test func poseSitsAtBaseYawAndPitch() {
+    let (eye, target) = CameraState.cityView.cameraPose
+    #expect(target == [0, 0, 0])
+    let d = eye - target
+    #expect(abs(simd_length(d) - CameraState.cameraDistance) < 1e-2)
+    #expect(abs(d.x - d.z) < 1e-3 && d.x > 0)  // 45 deg: (sin t, cos t) are equal and positive
+    #expect(abs(asin(d.y / simd_length(d)) - Float(35) * .pi / 180) < 1e-5)
+}
+
+@Test func poseFollowsFocusAndYaw() {
+    let s = CameraState(focusX: 7, focusZ: -3, zoom: 20, yawOffset: deg20)
+    let (eye, target) = s.cameraPose
+    #expect(target == [7, 0, -3])
+    let t = Float.pi / 4 + deg20
+    let d = eye - target
+    #expect(abs(atan2(d.x, d.z) - t) < 1e-5)
+}
+
+// The tested pan math and the camera placement must agree: a ground point follows the cursor exactly.
+@Test func groundPointFollowsTheDragAtAnyYaw() {
+    let size = CGSize(width: 1280, height: 800)
+    for yaw in [-deg20, 0, deg20] {
+        let s = CameraState(focusX: 3, focusZ: -2, zoom: 24, yawOffset: yaw)
+        let p: SIMD3<Float> = [5, 0, 4]
+        let before = s.screenPoint(of: p, viewSize: size)
+        let after = s.panned(screenDelta: [70, -30], viewHeightPoints: 800).screenPoint(of: p, viewSize: size)
+        #expect(abs(after.x - before.x - 70) < 0.01)
+        #expect(abs(after.y - before.y + 30) < 0.01)
+    }
+}
+
+@Test func visibleHalfHeightEqualsZoom() {
+    let s = CameraState(focusX: 0, focusZ: 0, zoom: 20, yawOffset: 0)
+    let size = CGSize(width: 1000, height: 600)
+    let pose = s.cameraPose
+    let forward = simd_normalize(pose.target - pose.position)
+    let up = simd_cross(simd_normalize(simd_cross(forward, [0, 1, 0])), forward)
+    #expect(abs(s.screenPoint(of: up * 20, viewSize: size).y) < 0.01)  // top edge of the view
+    #expect(s.screenPoint(of: .zero, viewSize: size) == CGPoint(x: 500, y: 300))
+}
+
+@Test func pickRayPassesThroughTheProjectedPoint() {
+    let size = CGSize(width: 1280, height: 800)
+    let s = CameraState(focusX: 4, focusZ: -9, zoom: 18, yawOffset: -deg20)
+    let p: SIMD3<Float> = [-6, 3, 11]
+    let ray = s.pickRay(at: s.screenPoint(of: p, viewSize: size), viewSize: size)
+    let along = simd_dot(p - ray.origin, ray.direction)
+    #expect(simd_length(ray.origin + ray.direction * along - p) < 1e-3)
+    #expect(abs(simd_length(ray.direction) - 1) < 1e-5)
+}
+
+// Rotating the fingers clockwise turns the world clockwise on screen.
+@Test func positiveRotationTurnsWorldClockwise() {
+    let size = CGSize(width: 800, height: 800)
+    let p: SIMD3<Float> = [10, 0, -10]  // straight right of center at yaw 0
+    let a = CameraState.cityView.screenPoint(of: p, viewSize: size)
+    let b = CameraState.cityView.rotated(byRadians: 0.2).screenPoint(of: p, viewSize: size)
+    #expect(abs(a.y - 400) < 0.01 && b.y > a.y)  // right-side point moves down
+}
+
+@Test func scrollUpZoomsInAndWheelNotchIsCoarser() {
+    let s = CameraState.cityView
+    #expect(s.scrolled(deltaY: 10, precise: true).zoom < s.zoom)
+    #expect(s.scrolled(deltaY: -10, precise: true).zoom > s.zoom)
+    #expect(s.scrolled(deltaY: 1, precise: false).zoom < s.scrolled(deltaY: 1, precise: true).zoom)
+    #expect(s.scrolled(deltaY: 1e9, precise: true).zoom == 6)
+    #expect(s.scrolled(deltaY: -1e9, precise: true).zoom == 60)
 }
 
 private func freshDefaults() -> (UserDefaults, String) {

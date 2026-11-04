@@ -3,7 +3,7 @@ import LifeCore
 import RealityKit
 
 public extension DistrictType {
-    /// Signage/trim color, linear RGB 0...1.
+    /// Signage/trim color, sRGB 0...1 (NSColor takes them as display values, not linear).
     var accent: SIMD3<Float> {
         switch self {
         case .productivity: [0.20, 0.45, 0.90]  // blue
@@ -65,9 +65,8 @@ public extension DistrictType {
         case .garden: garden(root, ctx)
         }
         let (size, center) = collisionBox(of: root)
-        var collision = CollisionComponent(shapes: [.generateBox(size: size).offsetBy(translation: center)])
-        collision.filter = CollisionFilter(group: [], mask: [])  // pick-only, no physics
-        root.components.set(collision)
+        // Default filter on purpose: the picking raycast cannot see an empty group or mask. No physics bodies exist.
+        root.components.set(CollisionComponent(shapes: [.generateBox(size: size).offsetBy(translation: center)]))
         root.components.set(InputTargetComponent())
         return root
     }
@@ -117,7 +116,7 @@ public extension DistrictType {
         let sd = c.d * 0.6
         r.addChild(box([c.w, c.h, sd], y: 0, Mat.concrete))
         r.addChild(box([c.w * 0.86, c.h * 0.7, 0.06], y: c.h * 0.12, z: sd / 2, Mat.glass))
-        r.addChild(box([c.w + 0.1, 0.2, sd + 0.1], y: c.h - 0.2, c.trim))
+        r.addChild(box([c.w + 0.1, 0.2, sd + 0.1], y: c.h - 0.4, c.trim))
         r.addChild(sign(c, width: c.w * 0.4, y: 0.2, depth: sd))
     }
 
@@ -127,7 +126,7 @@ public extension DistrictType {
         for (i, t) in tiers.enumerated() {
             let (w, d, h) = (c.w * t.0, c.d * t.0, c.h * t.1)
             r.addChild(box([w, h, d], y: y, i == 2 ? Mat.glass : Mat.warmWhite))
-            r.addChild(box([w + 0.1, 0.15, d + 0.1], y: y + h - 0.15, c.trim))
+            r.addChild(box([w + 0.1, 0.15, d + 0.1], y: y + h - 0.35, c.trim))
             y += h
         }
         r.addChild(sign(c, width: c.w * 0.4, y: 0.3, depth: c.d))
@@ -187,7 +186,7 @@ public extension DistrictType {
         r.addChild(box([c.w * 0.5, c.h, c.d * 0.42], x: -c.w * 0.22, y: 0.2, z: -c.d * 0.25, Mat.warmWhite))
         r.addChild(box([c.w * 0.42, c.h * 0.7, c.d * 0.5], x: c.w * 0.25, y: 0.2, z: c.d * 0.2, Mat.concrete))
         r.addChild(box([c.w * 0.5, 0.15, 0.7], x: 0, y: c.h * 0.4, z: -c.d * 0.02, Mat.glass))
-        r.addChild(box([c.w * 0.5 + 0.1, 0.15, c.d * 0.42 + 0.1], x: -c.w * 0.22, y: c.h + 0.05, z: -c.d * 0.25, c.trim))
+        r.addChild(box([c.w * 0.5 + 0.1, 0.15, c.d * 0.42 + 0.1], x: -c.w * 0.22, y: c.h - 0.15, z: -c.d * 0.25, c.trim))
         r.addChild(sign(c, width: c.w * 0.3, y: 0.3, depth: c.d))
     }
 
