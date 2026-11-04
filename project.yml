@@ -21,6 +21,7 @@ targets:
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Life OS"
         SWIFT_VERSION: "6.0"
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Automatic

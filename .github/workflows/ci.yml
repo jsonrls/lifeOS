@@ -6,7 +6,7 @@ on:
     branches: [staging, main]
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - run: swift test --package-path Packages/LifeKit

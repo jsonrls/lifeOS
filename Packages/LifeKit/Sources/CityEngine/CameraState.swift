@@ -22,7 +22,7 @@ public struct CameraState: Codable, Equatable, Sendable {
     static let pitch: Float = 35 * .pi / 180
 
     // Zoom 32 fits the ~+-27 tile city on a typical landscape window.
-    public static let cityView = CameraState(focusX: 0, focusZ: 0, zoom: 32, yawOffset: 0)
+    public static let cityView = CameraState(focusX: -4, focusZ: -4, zoom: 32, yawOffset: 0)
 
     public static func districtView(_ b: TileRect) -> CameraState {
         CameraState(focusX: b.center.x, focusZ: b.center.z, zoom: 16, yawOffset: 0).clamped()

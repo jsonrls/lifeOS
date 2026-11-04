@@ -1,10 +1,12 @@
 import CityEngine
 import LifeCore
+import AppKit
 import SwiftUI
 
 @main
 struct LifeOSApp: App {
     @State private var store: CityStore
+    private let cameras = CameraStore(defaults: .standard)
 
     init() {
         let cameras = CameraStore(defaults: .standard)
@@ -12,10 +14,19 @@ struct LifeOSApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { MainView(store: store) }
+        WindowGroup {
+            MainView(store: store)
+                // A quit mid-drag or within 300 ms of a scroll would otherwise lose the last camera move.
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+                    cameras.save(store.camera)
+                }
+        }
             .defaultSize(width: 1280, height: 800)
             .windowResizability(.contentMinSize)
-            .commands { CityCommands(store: store) }
+            .commands {
+                CommandGroup(replacing: .newItem) {}  // one window: all windows would share one store
+                CityCommands(store: store)
+            }
         Settings { Text("Settings").padding(40).frame(minWidth: 320) }
     }
 }

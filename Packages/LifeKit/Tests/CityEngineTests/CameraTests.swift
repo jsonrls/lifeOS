@@ -7,6 +7,9 @@ import LifeCore
 
 private let deg20 = Float(20) * .pi / 180
 
+/// Focus at the world origin, for tests that reason from (0, 0); `cityView` itself is nudged off it.
+private let origin = CameraState(focusX: 0, focusZ: 0, zoom: 32, yawOffset: 0)
+
 @Test func zoomClampsAtBothEnds() {
     #expect(CameraState.cityView.zoomed(byFactor: 1e6).zoom == 60)
     #expect(CameraState.cityView.zoomed(byFactor: 1e-6).zoom == 6)
@@ -22,7 +25,7 @@ private let deg20 = Float(20) * .pi / 180
 // At yawOffset 0 the camera yaw is 45 deg, so screen-right on the ground is (+x, -z)/sqrt2:
 // focus moves (-x, +z) with equal magnitude.
 @Test func panRightMovesWorldRightAtZeroYaw() {
-    var s = CameraState.cityView; s.zoom = 20
+    var s = origin; s.zoom = 20
     let p = s.panned(screenDelta: [100, 0], viewHeightPoints: 400)
     let step: Float = 10 / Float(2).squareRoot()
     #expect(abs(p.focusX + step) < 1e-4)
@@ -31,7 +34,7 @@ private let deg20 = Float(20) * .pi / 180
 
 // Dragging down moves the world down: focus moves toward screen-up, divided by sin(35 deg).
 @Test func panDownMovesFocusUpScreenWithForeshortening() {
-    var s = CameraState.cityView; s.zoom = 20
+    var s = origin; s.zoom = 20
     let p = s.panned(screenDelta: [0, 100], viewHeightPoints: 400)
     let sinPitch: Float = sin(Float(35) * .pi / 180)
     let step: Float = 10 / sinPitch / Float(2).squareRoot()
@@ -40,7 +43,7 @@ private let deg20 = Float(20) * .pi / 180
 }
 
 @Test func panAccountsForYaw() {
-    var s = CameraState.cityView; s.zoom = 20; s.yawOffset = deg20
+    var s = origin; s.zoom = 20; s.yawOffset = deg20
     let p = s.panned(screenDelta: [100, 0], viewHeightPoints: 400)
     let yaw = Float.pi / 4 + deg20
     let step: Float = 10
@@ -114,7 +117,7 @@ private let deg20 = Float(20) * .pi / 180
 // MARK: camera placement
 
 @Test func poseSitsAtBaseYawAndPitch() {
-    let (eye, target) = CameraState.cityView.cameraPose
+    let (eye, target) = origin.cameraPose
     #expect(target == [0, 0, 0])
     let d = eye - target
     #expect(abs(simd_length(d) - CameraState.cameraDistance) < 1e-2)
@@ -168,8 +171,8 @@ private let deg20 = Float(20) * .pi / 180
 @Test func positiveRotationTurnsWorldClockwise() {
     let size = CGSize(width: 800, height: 800)
     let p: SIMD3<Float> = [10, 0, -10]  // straight right of center at yaw 0
-    let a = CameraState.cityView.screenPoint(of: p, viewSize: size)
-    let b = CameraState.cityView.rotated(byRadians: 0.2).screenPoint(of: p, viewSize: size)
+    let a = origin.screenPoint(of: p, viewSize: size)
+    let b = origin.rotated(byRadians: 0.2).screenPoint(of: p, viewSize: size)
     #expect(abs(a.y - 400) < 0.01 && b.y > a.y)  // right-side point moves down
 }
 

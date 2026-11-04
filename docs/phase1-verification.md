@@ -27,6 +27,7 @@ Caveats:
 - Click latency is from the posted mouse-up to the store's `selectedBuildingID` changing, then to the next RealityKit frame. SwiftUI draws the inspector in the same main-thread update; its draw time is not separately timed. Roughly one frame (about 14-17 ms, an estimate, not measured separately) of the figure is probably tap recognition.
 - Without a prior hover step, several early driver clicks did not register (the driver has no real cursor). Those runs are excluded; the table uses clicks preceded by a hover. A click with no selection change prints "no selection change" and is not counted.
 - Nothing measured on a physical mouse or trackpad.
+- Idle energy was not measured. The scene renders at 60 fps while idle (63 frames in 1.05 s in every run above).
 
 Raw logs: `.superpowers/sdd/2026-11-04-life-os-phase1-city-foundation/evidence/task7-r2-perf-*.txt` (gitignored).
 

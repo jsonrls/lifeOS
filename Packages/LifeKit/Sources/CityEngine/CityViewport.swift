@@ -164,6 +164,8 @@ private struct ScrollWheelMonitor: NSViewRepresentable {
         var obstructions: [CGRect] = []
         private var monitor: Any?
 
+        isolated deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             if let monitor { NSEvent.removeMonitor(monitor) }
