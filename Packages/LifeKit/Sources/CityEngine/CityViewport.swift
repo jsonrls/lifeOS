@@ -10,7 +10,9 @@ public struct CityViewport: View {
     @Binding private var selectedBuildingID: String?
     private let onOpenBuilding: (String) -> Void
     private let obstructions: [CGRect]
-    private let onFrame: ((TimeInterval) -> Void)?
+    #if DEBUG
+    private var onFrame: ((TimeInterval) -> Void)?  // perf probe, absent from Release
+    #endif
 
     @State private var cameraEntity = Entity()
     // GestureState, not State: a cancelled gesture never calls onEnded, and a stale baseline would jump the next one.
@@ -18,18 +20,19 @@ public struct CityViewport: View {
     @GestureState private var lastMagnification: CGFloat = 1
     @GestureState private var lastRotation: Angle = .zero
     @State private var scrollSave: Task<Void, Never>?
+    #if DEBUG
     @State private var frameSub: EventSubscription?
+    #endif
 
     private let store = CameraStore(defaults: .standard)
 
     public init(camera: Binding<CameraState>, hoveredBuildingID: Binding<String?>,
-                selectedBuildingID: Binding<String?>, obstructions: [CGRect] = [], onFrame: ((TimeInterval) -> Void)? = nil,
+                selectedBuildingID: Binding<String?>, obstructions: [CGRect] = [],
                 onOpenBuilding: @escaping (String) -> Void) {
         _camera = camera
         _hoveredBuildingID = hoveredBuildingID
         _selectedBuildingID = selectedBuildingID
         self.obstructions = obstructions
-        self.onFrame = onFrame
         self.onOpenBuilding = onOpenBuilding
     }
 
@@ -38,7 +41,9 @@ public struct CityViewport: View {
             RealityView { content in
                 content.add(CitySceneBuilder.makeScene())
                 content.add(cameraEntity)
-                if let onFrame { frameSub = content.subscribe(to: SceneEvents.Update.self) { onFrame($0.deltaTime) } }  // perf probe, off unless given
+                #if DEBUG
+                if let onFrame { frameSub = content.subscribe(to: SceneEvents.Update.self) { onFrame($0.deltaTime) } }
+                #endif
             } update: { _ in
                 Self.apply(camera, to: cameraEntity)
             }
@@ -60,6 +65,11 @@ public struct CityViewport: View {
             .background(Color(red: 0.80, green: 0.85, blue: 0.87))  // pale haze, same in light and dark mode
         }
     }
+
+    #if DEBUG
+    /// Calls `f` with the delta time of every rendered frame.
+    public func frameProbe(_ f: @escaping (TimeInterval) -> Void) -> CityViewport { var v = self; v.onFrame = f; return v }
+    #endif
 
     static func apply(_ s: CameraState, to entity: Entity) {
         let pose = s.cameraPose

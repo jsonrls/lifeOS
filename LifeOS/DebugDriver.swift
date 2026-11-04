@@ -97,6 +97,7 @@ import SwiftUI
         case "perfstart": FrameLog.dts = []; FrameLog.recording = true
         case "perfend": FrameLog.summary(a.first ?? "")
         case "latency": await latency(point(a, s), s)
+        case "appearance": NSApp.appearance = NSAppearance(named: a[0] == "light" ? .aqua : .darkAqua)  // app only, no system setting
         case "key": key(a[0], command: true)  // key <char>: ⌘ + char
         case "esc": key("\u{1b}", command: false, code: 53)
         default: print("unknown step \(cmd)")
@@ -154,6 +155,7 @@ import SwiftUI
         while ContinuousClock.now - t0 < .seconds(1) {
             if tSel == nil, s.selected.wrappedValue != before { tSel = .now }
             if let tSel, FrameLog.lastFrame > tSel { break }
+            if tSel == nil, ContinuousClock.now - t0 > .milliseconds(500) { return print("latency: no selection change") }
             try? await Task.sleep(for: .milliseconds(1))
         }
         func ms(_ d: Duration) -> Double { Double(d.components.attoseconds) / 1e15 + Double(d.components.seconds) * 1000 }

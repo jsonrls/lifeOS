@@ -14,7 +14,7 @@ struct BuildingInspector: View {
                 .background(building.tint.opacity(0.3), in: .capsule)
             Text("Level 1 of \(building.maxLevel)").font(.callout)
             Divider()
-            Text("Sample data").font(.caption).foregroundStyle(.secondary)
+            Text("Sample data").font(.caption).foregroundStyle(.primary.opacity(0.85))
             LabeledContent("Activity", value: "12 this week").font(.callout)
             LabeledContent("Streak", value: "4 days").font(.callout)
             LabeledContent("Progress", value: "20%").font(.callout)

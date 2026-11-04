@@ -10,19 +10,12 @@ struct MainView: View {
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var frameProbe: ((TimeInterval) -> Void)? {
-        #if DEBUG
-        FrameLog.tick
-        #else
-        nil
-        #endif
-    }
-
     var body: some View {
         ZStack {
             CityViewport(camera: $store.camera, hoveredBuildingID: $store.hoveredBuildingID,
                          selectedBuildingID: Binding(get: { store.selectedBuildingID }, set: { store.select($0) }),
-                         obstructions: panels, onFrame: frameProbe, onOpenBuilding: { opened = $0 })
+                         obstructions: panels, onOpenBuilding: { opened = $0 })
+                .withFrameProbe()
                 .ignoresSafeArea()
             VStack(spacing: 12) {
                 TopBar().panel()
@@ -66,9 +59,9 @@ private struct TopBar: View {
     var body: some View {
         HStack(spacing: 14) {
             Text("Life OS").font(.headline)
-            Text("City Level 1").foregroundStyle(.secondary)
+            Text("City Level 1").foregroundStyle(.primary.opacity(0.85))
             Text(Date.now, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().year())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary.opacity(0.85))
         }
         .font(.callout)
         .padding(.horizontal, 16).padding(.vertical, 8)
@@ -83,11 +76,22 @@ private struct PanelFrames: PreferenceKey {
     static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) { value += nextValue() }
 }
 
+extension CityViewport {
+    func withFrameProbe() -> some View {
+        #if DEBUG
+        frameProbe(FrameLog.tick)
+        #else
+        self
+        #endif
+    }
+}
+
 extension View {
     /// Liquid Glass card that also takes clicks, so they never reach the city behind it.
     func panel() -> some View {
         self
             .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            .background(Color(nsColor: .windowBackgroundColor).opacity(0.8), in: .rect(cornerRadius: 16))  // keeps text contrast over any city or sky behind the glass
             .contentShape(.rect(cornerRadius: 16))
             .background(GeometryReader { Color.clear.preference(key: PanelFrames.self, value: [$0.frame(in: .global)]) })
     }
