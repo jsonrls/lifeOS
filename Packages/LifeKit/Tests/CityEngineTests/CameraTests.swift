@@ -62,6 +62,32 @@ private let deg20 = Float(20) * .pi / 180
     }
 }
 
+@Test func mixedNonFiniteKeepsFiniteFields() {
+    let s = CameraState(focusX: 5, focusZ: -6, zoom: .nan, yawOffset: 0.1).clamped()
+    #expect(s == CameraState(focusX: 5, focusZ: -6, zoom: CameraState.cityView.zoom, yawOffset: 0.1))
+}
+
+@Test func zoomExtremeFactorsClampNotFallBack() {
+    #expect(CameraState.cityView.zoomed(byFactor: .greatestFiniteMagnitude).zoom == 60)
+    #expect(CameraState.cityView.zoomed(byFactor: .leastNonzeroMagnitude).zoom == 6)
+}
+
+@Test func nonFinitePanAndRotateAreIgnored() {
+    let s = CameraState(focusX: 5, focusZ: 6, zoom: 20, yawOffset: 0.1)
+    #expect(s.panned(screenDelta: [.nan, 1], viewHeightPoints: 400) == s)
+    #expect(s.panned(screenDelta: [1, .infinity], viewHeightPoints: 400) == s)
+    #expect(s.rotated(byRadians: .nan) == s)
+    #expect(s.rotated(byRadians: -.infinity) == s)
+}
+
+@Test func hugeFinitePanAndRotateClampToBounds() {
+    let s = CameraState(focusX: 5, focusZ: 6, zoom: 60, yawOffset: 0)
+    let p = s.panned(screenDelta: [.greatestFiniteMagnitude, 0], viewHeightPoints: 1)
+    #expect(p.focusX == -40 && p.focusZ == 40)
+    #expect(s.rotated(byRadians: .greatestFiniteMagnitude).yawOffset == deg20)
+    #expect(s.rotated(byRadians: -.greatestFiniteMagnitude).yawOffset == -deg20)
+}
+
 @Test func focusClampsToBounds() {
     let s = CameraState(focusX: 999, focusZ: -999, zoom: 20, yawOffset: 0).clamped()
     #expect(s.focusX == 40 && s.focusZ == -40)
@@ -106,6 +132,5 @@ private func freshDefaults() -> (UserDefaults, String) {
     let (d, name) = freshDefaults(); defer { d.removePersistentDomain(forName: name) }
     let store = CameraStore(defaults: d)
     store.save(CameraState(focusX: 500, focusZ: 0, zoom: 1000, yawOffset: 5))
-    let s = store.load()
-    #expect(s.focusX == 40 && s.zoom == 60 && abs(s.yawOffset - deg20) < 1e-6)
+    #expect(store.load() == .cityView)
 }

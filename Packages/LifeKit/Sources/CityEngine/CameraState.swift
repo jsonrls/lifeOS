@@ -34,27 +34,37 @@ public struct CameraState: Codable, Equatable, Sendable {
 
     /// Sign convention: the world follows the cursor, so focus moves opposite to the drag.
     /// Camera yaw t gives ground right = (cos t, -sin t) and ground up = (-sin t, -cos t) in (x, z).
+    /// Math runs in Double so huge finite inputs clamp to the bounds instead of overflowing Float.
     public func panned(screenDelta d: SIMD2<Float>, viewHeightPoints: Float) -> CameraState {
-        guard viewHeightPoints > 0, viewHeightPoints.isFinite else { return self }
-        let k = 2 * zoom / viewHeightPoints
-        let t = Self.baseYaw + yawOffset
-        let right = SIMD2<Float>(cos(t), -sin(t))
-        let up = SIMD2<Float>(-sin(t), -cos(t))
-        let move = -right * (d.x * k) + up * (d.y * k / sin(Self.pitch))
+        guard viewHeightPoints > 0, viewHeightPoints.isFinite, d.x.isFinite, d.y.isFinite else { return self }
+        let k = 2 * Double(zoom) / Double(viewHeightPoints)
+        let t = Double(Self.baseYaw) + Double(yawOffset)
+        let dx = Double(d.x) * k
+        let dy = Double(d.y) * k / Double(sin(Self.pitch))
+        let mx = -dx * cos(t) - dy * sin(t)
+        let mz = dx * sin(t) - dy * cos(t)
         var s = self
-        s.focusX += move.x; s.focusZ += move.y
+        s.focusX = Self.clampD(Double(focusX) + mx, Double(Self.maxFocus))
+        s.focusZ = Self.clampD(Double(focusZ) + mz, Double(Self.maxFocus))
         return s.clamped()
     }
 
     public func zoomed(byFactor f: Float) -> CameraState {
         guard f.isFinite, f > 0 else { return self }
-        var s = self; s.zoom *= f
+        var s = self
+        s.zoom = Float(min(max(Double(zoom) * Double(f), Double(Self.zoomRange.lowerBound)), Double(Self.zoomRange.upperBound)))
         return s.clamped()
     }
 
     public func rotated(byRadians r: Float) -> CameraState {
-        var s = self; s.yawOffset += r
+        guard r.isFinite else { return self }
+        var s = self
+        s.yawOffset = Self.clampD(Double(yawOffset) + Double(r), Double(Self.maxYaw))
         return s.clamped()
+    }
+
+    private static func clampD(_ v: Double, _ bound: Double) -> Float {
+        Float(min(max(v, -bound), bound))
     }
 
     public func clamped() -> CameraState {

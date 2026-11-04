@@ -1,8 +1,7 @@
 import Foundation
 
 public struct CameraStore {
-    // UserDefaults is documented thread-safe.
-    nonisolated(unsafe) private let defaults: UserDefaults
+    private let defaults: UserDefaults
     private let key: String
 
     public init(defaults: UserDefaults, key: String = "lifeos.camera") {
@@ -12,7 +11,7 @@ public struct CameraStore {
     public func load() -> CameraState {
         guard let data = defaults.data(forKey: key),
               let s = try? JSONDecoder().decode(CameraState.self, from: data) else { return .cityView }
-        return s.clamped()
+        return s == s.clamped() ? s : .cityView
     }
 
     public func save(_ s: CameraState) {
